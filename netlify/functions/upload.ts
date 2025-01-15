@@ -1,10 +1,11 @@
 import { Handler } from '@netlify/functions';
 import { getStore } from '@netlify/blobs';
 import busboy from 'busboy';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
 
 // 获取 Netlify Blobs store
 const getNetlifyStore = () => {
-  // 只在 Netlify 环境中使用 Blobs
   if (process.env.NETLIFY) {
     return getStore({
       name: 'uploads',
@@ -12,6 +13,23 @@ const getNetlifyStore = () => {
     });
   }
   return null;
+};
+
+// 本地保存文件
+const saveLocalFile = (buffer: Buffer, filename: string) => {
+  const uploadDir = join(process.cwd(), 'public', 'uploads');
+  
+  // 确保上传目录存在
+  if (!existsSync(uploadDir)) {
+    mkdirSync(uploadDir, { recursive: true });
+  }
+
+  const filePath = join(uploadDir, filename);
+  writeFileSync(filePath, buffer);
+
+  // 返回本地访问URL
+  const localUrl = `/uploads/${filename}`;
+  return localUrl;
 };
 
 export const handler: Handler = async (event) => {
@@ -86,8 +104,9 @@ export const handler: Handler = async (event) => {
             const store = getNetlifyStore();
             
             if (!store) {
-              // 本地开发环境：返回 base64 数据
-              result.fileUrl = `data:${info.mimeType};base64,${buffer.toString('base64')}`;
+              // 本地开发环境：保存到 public/uploads 目录
+              const localUrl = saveLocalFile(buffer, filename);
+              result.fileUrl = localUrl;
               return;
             }
 
