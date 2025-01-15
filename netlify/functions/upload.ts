@@ -2,6 +2,18 @@ import { Handler } from '@netlify/functions';
 import { getStore } from '@netlify/blobs';
 import busboy from 'busboy';
 
+// 获取 Netlify Blobs store
+const getNetlifyStore = () => {
+  // 只在 Netlify 环境中使用 Blobs
+  if (process.env.NETLIFY) {
+    return getStore({
+      name: 'uploads',
+      consistency: 'strong'
+    });
+  }
+  return null;
+};
+
 export const handler: Handler = async (event) => {
   console.log('Content-Type:', event.headers['content-type']);
   console.log('Content-Length:', event.headers['content-length']);
@@ -71,36 +83,28 @@ export const handler: Handler = async (event) => {
 
             const filename = `${Date.now()}-${info.filename}`;
             
-            let store;
-            try {
-              // 尝试获取 Netlify Blobs store
-              store = getStore({
-                name: 'uploads',
-                consistency: 'strong'
-              });
-            } catch (error) {
-              console.warn('Netlify Blobs 未配置，使用临时存储');
-              // 如果在本地开发环境，返回 base64 数据
+            const store = getNetlifyStore();
+            
+            if (!store) {
+              // 本地开发环境：返回 base64 数据
               result.fileUrl = `data:${info.mimeType};base64,${buffer.toString('base64')}`;
               return;
             }
 
-            if (store) {
-              // 在 Netlify 环境中使用 Blobs
-              await store.set(filename, buffer, {
-                metadata: {
-                  filename: info.filename,
-                  mimeType: info.mimeType,
-                  size: buffer.length,
-                  uploadedAt: new Date().toISOString()
-                },
-                type: info.mimeType
-              });
-              
-              const url = await store.getUrl(filename);
-              result.fileUrl = url;
-              console.log('文件上传成功:', url);
-            }
+            // Netlify 环境：使用 Blobs 存储
+            await store.set(filename, buffer, {
+              metadata: {
+                filename: info.filename,
+                mimeType: info.mimeType,
+                size: buffer.length,
+                uploadedAt: new Date().toISOString()
+              },
+              type: info.mimeType
+            });
+            
+            const url = await store.getUrl(filename);
+            result.fileUrl = url;
+            console.log('文件上传成功:', url);
           } catch (error) {
             console.error('文件上传错误:', error);
             result.error = `文件上传失败: ${error.message}`;
