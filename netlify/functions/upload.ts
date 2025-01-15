@@ -1,35 +1,18 @@
 import { Handler } from '@netlify/functions';
 import { getStore } from '@netlify/blobs';
 import busboy from 'busboy';
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
 
 // 获取 Netlify Blobs store
 const getNetlifyStore = () => {
-  if (process.env.NETLIFY) {
+  try {
     return getStore({
       name: 'uploads',
       consistency: 'strong'
     });
+  } catch (error) {
+    console.error('获取 Netlify Blobs store 失败:', error);
+    return null;
   }
-  return null;
-};
-
-// 本地保存文件
-const saveLocalFile = (buffer: Buffer, filename: string) => {
-  const uploadDir = join(process.cwd(), 'public', 'uploads');
-  
-  // 确保上传目录存在
-  if (!existsSync(uploadDir)) {
-    mkdirSync(uploadDir, { recursive: true });
-  }
-
-  const filePath = join(uploadDir, filename);
-  writeFileSync(filePath, buffer);
-
-  // 返回本地访问URL
-  const localUrl = `/uploads/${filename}`;
-  return localUrl;
 };
 
 export const handler: Handler = async (event) => {
@@ -78,11 +61,9 @@ export const handler: Handler = async (event) => {
       const result: { fileUrl?: string; error?: string } = {};
       let fileBuffer: Buffer[] = [];
       let hasFile = false;
-      let fileInfo: { filename: string; mimeType: string } | null = null;
 
       bb.on('file', (name, file, info) => {
         hasFile = true;
-        fileInfo = info;
         console.log('开始处理文件:', info.filename);
         console.log('文件类型:', info.mimeType);
         
@@ -100,17 +81,13 @@ export const handler: Handler = async (event) => {
             console.log('文件大小:', buffer.length);
 
             const filename = `${Date.now()}-${info.filename}`;
-            
             const store = getNetlifyStore();
-            
+
             if (!store) {
-              // 本地开发环境：保存到 public/uploads 目录
-              const localUrl = saveLocalFile(buffer, filename);
-              result.fileUrl = localUrl;
-              return;
+              throw new Error('Netlify Blobs 服务不可用');
             }
 
-            // Netlify 环境：使用 Blobs 存储
+            // 使用 Netlify Blobs 存储文件
             await store.set(filename, buffer, {
               metadata: {
                 filename: info.filename,
