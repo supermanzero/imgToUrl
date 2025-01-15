@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import axios from "axios";
 
 const uploadedUrls = ref<string[]>([]);
 const isUploading = ref(false);
@@ -9,6 +8,7 @@ const handleFileUpload = async (event: Event) => {
   const input = event.target as HTMLInputElement;
   if (!input.files?.length) return;
 
+  isUploading.value = true;
   const file = input.files[0];
   const formData = new FormData();
   formData.append('file', file);
@@ -16,7 +16,6 @@ const handleFileUpload = async (event: Event) => {
   try {
     const response = await fetch('/.netlify/functions/upload', {
       method: 'POST',
-      // 注意：不要手动设置 Content-Type，让浏览器自动设置
       body: formData
     });
 
@@ -27,8 +26,13 @@ const handleFileUpload = async (event: Event) => {
 
     const result = await response.json();
     console.log('上传成功:', result.fileUrl);
+    uploadedUrls.value.push(result.fileUrl);
   } catch (error) {
     console.error('上传失败:', error);
+    alert(error.message || '上传失败，请重试');
+  } finally {
+    isUploading.value = false;
+    if (input) input.value = '';
   }
 };
 </script>

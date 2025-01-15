@@ -40,7 +40,7 @@ export const handler: Handler = async (event) => {
           ...event.headers
         },
         limits: {
-          fileSize: 5 * 1024 * 1024,
+          fileSize: 5 * 1024 * 1024, // 5MB 限制
           files: 1
         }
       });
@@ -48,9 +48,11 @@ export const handler: Handler = async (event) => {
       const result: { fileUrl?: string; error?: string } = {};
       let fileBuffer: Buffer[] = [];
       let hasFile = false;
+      let fileInfo: { filename: string; mimeType: string } | null = null;
 
       bb.on('file', (name, file, info) => {
         hasFile = true;
+        fileInfo = info;
         console.log('开始处理文件:', info.filename);
         console.log('文件类型:', info.mimeType);
         
@@ -69,11 +71,24 @@ export const handler: Handler = async (event) => {
 
             const filename = `${Date.now()}-${info.filename}`;
             
-            const store = getStore();
+            // 使用 Netlify Blobs 存储文件
+            const store = getStore({
+              name: 'uploads',
+              consistency: 'strong' // 使用强一致性
+            });
+
+            // 设置文件和元数据
             await store.set(filename, buffer, {
-              type: info.mimeType || 'application/octet-stream'
+              metadata: {
+                filename: info.filename,
+                mimeType: info.mimeType,
+                size: buffer.length,
+                uploadedAt: new Date().toISOString()
+              },
+              type: info.mimeType
             });
             
+            // 获取文件的公共 URL
             const url = await store.getUrl(filename);
             result.fileUrl = url;
             
@@ -120,11 +135,8 @@ export const handler: Handler = async (event) => {
         });
       });
 
-      if (event.headers['content-type']?.includes('multipart/form-data')) {
-        bb.end(Buffer.from(event.body, 'base64'));
-      } else {
-        throw new Error('不支持的 Content-Type，请使用 multipart/form-data');
-      }
+      const buffer = Buffer.from(event.body, 'base64');
+      bb.end(buffer);
     } catch (error) {
       console.error('处理请求错误:', error);
       resolve({
@@ -133,7 +145,7 @@ export const handler: Handler = async (event) => {
           'Access-Control-Allow-Origin': '*',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ error: error.message })
+        body: JSON.stringify({ error: '无效的请求数据' })
       });
     }
   });
