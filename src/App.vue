@@ -1,23 +1,23 @@
-<script setup lang="ts">
+`<script setup lang="ts">
 import ImageUploader from './components/ImageUploader.vue'
 </script>
 
 <template>
   <div class="container">
-    <h1>图片批量上传</h1>
+    <h1>图片上传</h1>
     <ImageUploader />
   </div>
 </template>
 
 <style>
 .container {
-  max-width: 1200px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 20px;
 }
 
 h1 {
-  text-align: center;
+  color: #42b883;
   margin-bottom: 30px;
 }
-</style>
+</style>`
