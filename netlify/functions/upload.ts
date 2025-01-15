@@ -40,7 +40,7 @@ export const handler: Handler = async (event) => {
           ...event.headers
         },
         limits: {
-          fileSize: 5 * 1024 * 1024, // 5MB 限制
+          fileSize: 5 * 1024 * 1024,
           files: 1
         }
       });
@@ -71,28 +71,36 @@ export const handler: Handler = async (event) => {
 
             const filename = `${Date.now()}-${info.filename}`;
             
-            // 使用 Netlify Blobs 存储文件
-            const store = getStore({
-              name: 'uploads',
-              consistency: 'strong' // 使用强一致性
-            });
+            let store;
+            try {
+              // 尝试获取 Netlify Blobs store
+              store = getStore({
+                name: 'uploads',
+                consistency: 'strong'
+              });
+            } catch (error) {
+              console.warn('Netlify Blobs 未配置，使用临时存储');
+              // 如果在本地开发环境，返回 base64 数据
+              result.fileUrl = `data:${info.mimeType};base64,${buffer.toString('base64')}`;
+              return;
+            }
 
-            // 设置文件和元数据
-            await store.set(filename, buffer, {
-              metadata: {
-                filename: info.filename,
-                mimeType: info.mimeType,
-                size: buffer.length,
-                uploadedAt: new Date().toISOString()
-              },
-              type: info.mimeType
-            });
-            
-            // 获取文件的公共 URL
-            const url = await store.getUrl(filename);
-            result.fileUrl = url;
-            
-            console.log('文件上传成功:', url);
+            if (store) {
+              // 在 Netlify 环境中使用 Blobs
+              await store.set(filename, buffer, {
+                metadata: {
+                  filename: info.filename,
+                  mimeType: info.mimeType,
+                  size: buffer.length,
+                  uploadedAt: new Date().toISOString()
+                },
+                type: info.mimeType
+              });
+              
+              const url = await store.getUrl(filename);
+              result.fileUrl = url;
+              console.log('文件上传成功:', url);
+            }
           } catch (error) {
             console.error('文件上传错误:', error);
             result.error = `文件上传失败: ${error.message}`;
