@@ -1,7 +1,6 @@
 import { Handler } from '@netlify/functions';
+import { getStore } from '@netlify/blobs';
 import busboy from 'busboy';
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -26,28 +25,20 @@ export const handler: Handler = async (event) => {
       file.on('end', async () => {
         try {
           const buffer = Buffer.concat(fileBuffer);
-          const uploadDir = join(process.cwd(), 'public', 'uploads');
-          
-          // 确保上传目录存在
-          if (!existsSync(uploadDir)) {
-            mkdirSync(uploadDir, { recursive: true });
-          }
-
           const filename = `${Date.now()}-${info.filename}`;
-          const filePath = join(uploadDir, filename);
           
-          // 保存文件
-          writeFileSync(filePath, buffer);
+          // 使用 Netlify Blobs 存储文件
+          const store = getStore();
+          await store.set(filename, buffer);
           
-          // 获取站点URL
-          const siteUrl = process.env.URL || process.env.DEPLOY_URL || 'http://localhost:8888';
+          // 获取文件的公共 URL
+          const url = await store.getUrl(filename);
+          result.fileUrl = url;
           
-          // 返回完整的URL
-          result.fileUrl = `${siteUrl}/uploads/${filename}`;
-          console.log('File URL:', result.fileUrl);
+          console.log('File uploaded successfully:', url);
         } catch (error) {
-          console.error('File save error:', error);
-          result.error = '文件保存失败';
+          console.error('File upload error:', error);
+          result.error = '文件上传失败';
         }
       });
     });

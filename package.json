@@ -9,8 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@netlify/functions": "^2.6.0",
-    "@types/busboy": "^1.5.4",
+    "@netlify/blobs": "^8.1.0",
     "@types/formidable": "^3.4.5",
     "axios": "^1.6.7",
     "busboy": "^1.6.0",
@@ -18,10 +17,12 @@
     "vue": "^3.4.38"
   },
   "devDependencies": {
-    "@types/node": "^20.11.24",
+    "@netlify/functions": "^3.0.0",
+    "@types/busboy": "^1.5.4",
+    "@types/node": "^20.17.13",
     "@vitejs/plugin-vue": "^5.1.3",
-    "vue-tsc": "1.8.22",
     "typescript": "^5.0.2",
-    "vite": "^5.0.12"
+    "vite": "^5.0.12",
+    "vue-tsc": "1.8.22"
   }
 }
