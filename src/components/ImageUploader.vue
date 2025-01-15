@@ -9,34 +9,26 @@ const handleFileUpload = async (event: Event) => {
   const input = event.target as HTMLInputElement;
   if (!input.files?.length) return;
 
-  isUploading.value = true;
-  const files = Array.from(input.files);
+  const file = input.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
 
   try {
-    const uploadPromises = files.map(async (file) => {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/.netlify/functions/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      return data.fileUrl;
+    const response = await fetch('/.netlify/functions/upload', {
+      method: 'POST',
+      // 注意：不要手动设置 Content-Type，让浏览器自动设置
+      body: formData
     });
 
-    const urls = await Promise.all(uploadPromises);
-    uploadedUrls.value.push(...urls);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '上传失败');
+    }
+
+    const result = await response.json();
+    console.log('上传成功:', result.fileUrl);
   } catch (error) {
-    console.error("Upload failed:", error);
-    alert("上传失败，请重试");
-  } finally {
-    isUploading.value = false;
-    if (input) input.value = "";
+    console.error('上传失败:', error);
   }
 };
 </script>
